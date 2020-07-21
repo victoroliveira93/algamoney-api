@@ -1,27 +1,25 @@
-package com.example.algamoneyapi.resource;
+package com.example.algamoney.api.resource;
 
-import java.net.URI;
 import java.util.List;
 
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.context.request.WebRequest;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
-import com.example.algamoneyapi.model.Categoria;
-import com.example.algamoneyapi.repository.CategoriaRepository;
+import com.example.algamoney.api.event.RecursoCriadoEvent;
+import com.example.algamoney.api.model.Categoria;
+import com.example.algamoney.api.repository.CategoriaRepository;
 
 @RestController 
 @RequestMapping("/categorias")
@@ -30,18 +28,21 @@ public class CategoriaResource {
 	@Autowired
 	private CategoriaRepository categoriaRepository;
 	
+	@Autowired
+	private ApplicationEventPublisher publisher;
+	
 	@GetMapping
 	public List<Categoria> listar() {
 		return categoriaRepository.findAll();
 	}
 	
 	@PostMapping
-	public ResponseEntity<Categoria> criar(@Valid @RequestBody Categoria categoria, HttpServletResponse response) {
+	public ResponseEntity<Categoria> criar(@RequestBody @Valid Categoria categoria, HttpServletResponse response) {
 		Categoria categoriaSalva = categoriaRepository.save(categoria);
-		URI uri = ServletUriComponentsBuilder.fromCurrentRequestUri().path("/{codigo}")
-			.buildAndExpand(categoriaSalva.getCodigo()).toUri();
+
+		publisher.publishEvent(new RecursoCriadoEvent(this, response, categoriaSalva.getCodigo()));
 		
-		return ResponseEntity.created(uri).body(categoriaSalva);
+		return ResponseEntity.status(HttpStatus.CREATED).body(categoriaSalva);
 	}
 	
 	
@@ -158,6 +159,51 @@ Basicamente o que fazemos ali é pegar a URI "localhost:8080/categorias"
  Fazemos isso pois em outros servidores e ambientes como de produção, 
  o nome do host não vai ser "localhost". Isso vai ser dinâmico de acordo 
  com o host.
+*/
 
+/*
+@PostMapping
+public ResponseEntity<Categoria> criar(@RequestBody @Valid Categoria categoria) {
+	Categoria categoriaSalva = categoriaRepository.save(categoria);
+	URI uri = ServletUriComponentsBuilder.fromCurrentRequestUri().path("/{codigo}")
+		.buildAndExpand(categoriaSalva.getCodigo()).toUri();
+	
+	return ResponseEntity.created(uri).body(categoriaSalva);
+}
 
+O código do metodo criar era assim, mas como essa parte da URI será repetida em outras classes,
+foi criado o RecursoCriadoEvent que é um ApplicationEvent e um RecursoCriadoListener que é
+um ApplicationListener<RecursoCriadoEvent>
+
+Injetamos um Publicador de Evento de aplicação
+@Autowired
+	private ApplicationEventPublisher publisher;
+	
+e fazemos ele publicar o evento:
+publisher.publishEvent(new RecursoCriadoEvent(this, response, pessoaSalva.getCodigo()));
+this -> A classe q publicou o evento, ou seja, essa classe mesmo
+
+O método fica então assim:
+	@PostMapping
+	public ResponseEntity<Categoria> criar(@RequestBody @Valid Categoria categoria, HttpServletResponse response) {
+		Categoria categoriaSalva = categoriaRepository.save(categoria);
+
+		publisher.publishEvent(new RecursoCriadoEvent(this, response, categoriaSalva.getCodigo()));
+		
+		return ResponseEntity.status(HttpStatus.CREATED).body(categoriaSalva);
+	}
+	
+Foi necessário inserir o HttpServletResponse na assinatura do método e mudar o return,
+substituindo o .created(uri) por .status(HttpStatus.CREATED)
+por que não tem a variável uri mais no método
+*/
+
+/*
+No método Delete é retornado void, mas tem o @ResponseStatus(HttpStatus.NO_CONTENT)
+para pelo menos retornar o 204 (no content) que significa
+que o método deu certo, mas não tem conteúdo pra retornar
+
+Lembre-se:
+faixa 200: Ok
+faixa 400: erros
 */
