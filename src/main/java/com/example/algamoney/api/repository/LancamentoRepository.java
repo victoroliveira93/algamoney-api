@@ -10,5 +10,5 @@ import com.example.algamoney.api.repository.lancamento.LancamentoRepositoryQuery
 
 public interface LancamentoRepository extends JpaRepository<Lancamento, Long>, LancamentoRepositoryQuery {
 
-	public List<Lancamento> filtrar(LancamentoFilter lancamentoFilter);
+	
 }
